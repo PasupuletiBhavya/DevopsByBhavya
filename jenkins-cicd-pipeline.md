@@ -225,5 +225,7 @@ stage("Deployment") {
 
 ---
 
+📖 See Full Blog with Images & Demo: https://devops-by-bhavya.hashnode.dev/
+
 **Connect with me on [LinkedIn](https://www.linkedin.com/in/bhavya-pasupuleti/)** if you have questions or want to collaborate! 💬✨
 
