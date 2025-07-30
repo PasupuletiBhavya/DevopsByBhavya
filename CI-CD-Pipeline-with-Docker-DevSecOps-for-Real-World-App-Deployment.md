@@ -1,15 +1,4 @@
----
-title: "# CI/CD Pipeline with Docker: DevSecOps for Real-World App Deployment"
-seoTitle: "Docker-Focused Deployment Only"
-seoDescription: "Docker-Focused Deployment Only"
-datePublished: Tue Jun 10 2025 00:54:47 GMT+0000 (Coordinated Universal Time)
-cuid: cmbpt6llq000002jr8ad33d0h
-slug: cicd-pipeline-with-docker-devsecops-for-real-world-app-deployment
-cover: https://cdn.hashnode.com/res/hashnode/image/upload/v1753905658448/cd459bd3-1dd7-4135-84c7-258e9c0d54ac.jpeg
-ogImage: https://cdn.hashnode.com/res/hashnode/image/upload/v1749774705234/2480f345-c54f-4c69-a137-bd76540811b2.png
-tags: docker, github, deployment, sonarqube, kubernetes, slack, automation, devops, terraform, jenkins, devsecops, ci-cd, docker-images, devops-articles, trivy
 
----
 
 A practical DevSecOps pipeline built entirely with Docker and Jenkins — from code to cloud.
 
