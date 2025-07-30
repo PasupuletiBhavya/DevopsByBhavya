@@ -278,7 +278,6 @@ Use in Jenkins: Add `Secret Text` with ID: `k8-token`
 
 ---
 
-# Scaling DevSecOps with Kubernetes: Zero Downtime, Auto Healing, and More (Part 2 of 2)
 
 ## Jenkins UAT Deploy Pipeline
 
