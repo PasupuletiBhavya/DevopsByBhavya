@@ -19,146 +19,188 @@ We’ll cover:
 * GitOps with Argo CD
 * Environment Isolation (UAT, Staging, Prod)
 
+# Scaling DevSecOps with Kubernetes: Intro + Step 1 to 4 (In-Depth)
+
+## Introduction
+
+In the third phase of our comprehensive DevSecOps journey, we move beyond basic Docker deployments to a scalable and resilient Kubernetes setup. This shift is essential when transitioning from development environments to production-grade deployments that demand:
+
+* ⏱️ **Zero Downtime** during application upgrades
+* 🔁 **Automatic Rollbacks** in case of failures
+* 📈 **Auto Scaling** to manage fluctuating user traffic
+* ❤️ **Self-Healing** containers that recover from crashes
+
+To achieve this, we'll use Amazon EKS (Elastic Kubernetes Service), supported by Terraform for infrastructure automation, and a dedicated EC2 instance to host our DevSecOps control server running Jenkins, Docker, Trivy, SonarQube, and more.
+
 ---
 
-Step 1: Launch EC2 Instance for Jenkins and Tool Installation
+## Step 1: Launch EC2 Instance for Jenkins and Tool Installation
 
-This EC2 instance acts as the Ops Server. It hosts your CI/CD tools like Jenkins and Trivy, and serves as the central control node that interacts with your Kubernetes cluster.
+This EC2 instance acts as the **Ops Server**. It hosts your CI/CD tools like Jenkins and Trivy, and serves as the central control node that interacts with your Kubernetes cluster.
 
-EC2 Configuration:
+### EC2 Configuration:
 
-AMI: Amazon Linux 2 (Kernel 5.10 preferred for compatibility)
-
-Instance Type: t2.large (2 vCPUs, 8 GB RAM)
-
-Storage: Minimum 25 GB EBS volume
-
-Security Group: Allow inbound SSH (port 22)
-
-Key Pair: Choose an existing one or create a new key pair for SSH access
-
-IAM Role: Attach a role with access to EC2, S3, and EKS. You can reuse the role used in the Docker-based setup or create a fresh one.
+* **AMI**: Amazon Linux 2 (Kernel 5.10 preferred for compatibility)
+* **Instance Type**: `t2.large` (2 vCPUs, 8 GB RAM)
+* **Storage**: Minimum 25 GB EBS volume
+* **Security Group**: Allow inbound SSH (port 22)
+* **Key Pair**: Choose an existing one or create a new key pair for SSH access
+* **IAM Role**: Attach a role with access to EC2, S3, and EKS. You can reuse the role used in the Docker-based setup or create a fresh one.
 
 Once the instance is launched, SSH into it using:
 
+```bash
 ssh -i your-key.pem ec2-user@<your-ec2-public-ip>
+```
 
-Step 2: Install DevSecOps Toolchain
+---
+
+## Step 2: Install DevSecOps Toolchain
 
 All commands below are to be executed on your EC2 Ops Server.
 
-🔧 Git (Version Control)
+### 🔧 Git (Version Control)
 
+```bash
 yum install git -y
+```
 
-🔧 Jenkins (CI Server)
+### 🔧 Jenkins (CI Server)
 
+```bash
 sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
 sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
 sudo yum install java-17-amazon-corretto -y
 sudo yum install jenkins -y
 sudo systemctl start jenkins
 sudo systemctl enable jenkins
+```
 
-Access Jenkins at: http://<your-ec2-public-ip>:8080
+Access Jenkins at: `http://<your-ec2-public-ip>:8080`
 
-🔧 Docker (Container Engine)
+### 🔧 Docker (Container Engine)
 
+```bash
 sudo yum install docker -y
 sudo systemctl start docker
 sudo systemctl enable docker
 sudo chmod 777 /var/run/docker.sock
+```
 
-🔧 Terraform (IaC Tool)
+### 🔧 Terraform (IaC Tool)
 
+```bash
 sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
 sudo yum install terraform -y
+```
 
-🔧 SonarQube (Code Quality Scanner)
+### 🔧 SonarQube (Code Quality Scanner)
 
 Run it in a container:
 
+```bash
 docker run -itd --name sonar -p 9000:9000 sonarqube:lts-community
+```
 
-Access at: http://<your-ec2-public-ip>:9000
+Access at: `http://<your-ec2-public-ip>:9000`
 
-🔧 Trivy (Image Vulnerability Scanner)
+### 🔧 Trivy (Image Vulnerability Scanner)
 
+```bash
 wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.tar.gz
 tar zxvf trivy_0.18.3_Linux-64bit.tar.gz
 sudo mv trivy /usr/local/bin/
+```
 
-🔧 AWS CLI (v2)
+### 🔧 AWS CLI (v2)
 
+```bash
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 sudo ./aws/install
+```
 
-🔧 kubectl (Kubernetes CLI)
+### 🔧 kubectl (Kubernetes CLI)
 
+```bash
 curl -LO "https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl"
 chmod +x kubectl
 sudo mv kubectl /usr/local/bin/
 kubectl version --client
+```
 
-🔧 eksctl (EKS Bootstrap Tool)
+### 🔧 eksctl (EKS Bootstrap Tool)
 
+```bash
 curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" -o eksctl.tar.gz
 tar -zxvf eksctl.tar.gz
 sudo mv eksctl /usr/local/bin/
 eksctl version
+```
 
-Step 3: Provision an EKS Cluster Using Terraform
+---
+
+## Step 3: Provision an EKS Cluster Using Terraform
 
 We’ll now create an EKS cluster using infrastructure-as-code principles with Terraform.
 
-🔗 Clone Project Repo
+### 🔗 Clone Project Repo
 
+```bash
 git clone https://github.com/PasupuletiBhavya/devsecops-project.git
 cd devsecops-project/k8s-project/eks-terraform
+```
 
-📁 File Breakdown:
+### 📁 File Breakdown:
 
-backend.tf: Defines remote state storage (S3 + DynamoDB)
+* `backend.tf`: Defines remote state storage (S3 + DynamoDB)
+* `provider.tf`: AWS provider configuration
+* `main.tf`: Defines VPC, subnets, EKS cluster, node group, IAM roles, and security groups
 
-provider.tf: AWS provider configuration
+### ⚙️ Initialize and Apply Terraform
 
-main.tf: Defines VPC, subnets, EKS cluster, node group, IAM roles, and security groups
-
-⚙️ Initialize and Apply Terraform
-
+```bash
 terraform init               # Initialize the backend and download providers
 terraform plan               # Dry run to preview changes
 terraform apply --auto-approve   # Launch EKS cluster and related resources
+```
 
 Once finished, the cluster and worker nodes will be live in your AWS account.
 
-Step 4: Connect Jenkins EC2 Instance to EKS Cluster
+---
+
+## Step 4: Connect Jenkins EC2 Instance to EKS Cluster
 
 After EKS creation, connect your EC2 Ops Server to the EKS cluster.
 
-✅ Check Cluster Visibility
+### ✅ Check Cluster Visibility
 
+```bash
 eksctl get cluster --region us-east-1
+```
 
-Note: If EKSCTL CREATED shows as False, that's expected since Terraform provisioned it.
+> Note: If `EKSCTL CREATED` shows as `False`, that's expected since Terraform provisioned it.
 
-🔧 Configure kubectl Context
+### 🔧 Configure kubectl Context
 
+```bash
 aws eks update-kubeconfig --region us-east-1 --name EKS_CLOUD
+```
 
 This sets your kubeconfig to use the new cluster.
 
-🔍 Verify Connection to Cluster
+### 🔍 Verify Connection to Cluster
 
+```bash
 kubectl get nodes
+```
 
-You should see a list of worker nodes in the Ready state.
+You should see a list of worker nodes in the `Ready` state.
+
+---
 
 ✅ You’ve now completed the foundational setup. Jenkins is installed, your Kubernetes cluster is live, and connectivity is confirmed. The next phase involves creating Jenkins pipelines that build, scan, push, and deploy your application to this EKS cluster.
 
-
----
 
 ## Step 5: CI/CD for Staging & Production
 
