@@ -1,4 +1,4 @@
-# Scaling DevSecOps with Kubernetes: Zero Downtime, Auto Healing, and More
+# Scaling DevSecOps with Kubernetes: Zero Downtime, Auto Healing, and More 
 
 ## Introduction
 
@@ -16,82 +16,64 @@ We’ll cover:
 * EKS Setup on AWS
 * Writing YAMLs
 * Final Production Push
-* GitOps with Argo CD
-* Environment Isolation (UAT, Staging, Prod)
 
 ---
 
-## Step 1: Launch EC2 Instance for Jenkins and Tool Installation
+## Step 1: Launch EC2 Instance
 
-This EC2 instance acts as the **Ops Server**. It hosts your CI/CD tools like Jenkins and Trivy, and serves as the central control node that interacts with your Kubernetes cluster.
-
-### EC2 Configuration:
-
-* **AMI**: Amazon Linux 2 (Kernel 5.10 preferred for compatibility)
-* **Instance Type**: `t2.large` (2 vCPUs, 8 GB RAM)
-* **Storage**: Minimum 25 GB EBS volume
-* **Security Group**: Allow inbound SSH (port 22)
-* **Key Pair**: Choose an existing one or create a new key pair for SSH access
-* **IAM Role**: Attach a role with access to EC2, S3, and EKS. You can reuse the role used in the Docker-based setup or create a fresh one.
-
-Once the instance is launched, SSH into it using:
-
-```bash
-ssh -i your-key.pem ec2-user@<your-ec2-public-ip>
-```
+* **AMI**: Amazon Linux 2 (Kernel 5.10)
+* **Instance Type**: t2.large
+* **Storage**: 25 GB EBS
+* **Key Pair**: Existing or new
+* **IAM Role**: EC2, S3, EKS full access
+* **Security Group**: Port 22 open
 
 ---
 
-## Step 2: Install DevSecOps Toolchain
+## Step 2: Install DevSecOps Tech Stack
 
-All commands below are to be executed on your EC2 Ops Server.
-
-### Git (Version Control)
+### Git
 
 ```bash
 yum install git -y
 ```
 
-###  Jenkins (CI Server)
+### Jenkins
 
 ```bash
 sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
 sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-sudo yum install java-17-amazon-corretto -y
-sudo yum install jenkins -y
-sudo systemctl start jenkins
-sudo systemctl enable jenkins
+yum install java-17-amazon-corretto -y
+yum install jenkins -y
+systemctl start jenkins
+systemctl enable jenkins
+systemctl status jenkins
 ```
 
-Access Jenkins at: `http://<your-ec2-public-ip>:8080`
-
-###  Docker (Container Engine)
+### Docker
 
 ```bash
-sudo yum install docker -y
-sudo systemctl start docker
-sudo systemctl enable docker
-sudo chmod 777 /var/run/docker.sock
+yum install docker -y
+systemctl start docker
+systemctl enable docker
+systemctl status docker
+chmod 777 /var/run/docker.sock
 ```
 
-###  Terraform (IaC Tool)
+### Terraform
 
 ```bash
 sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
 sudo yum install terraform -y
 ```
 
-###  SonarQube (Code Quality Scanner)
-
-Run it in a container:
+### SonarQube (Docker)
 
 ```bash
 docker run -itd --name sonar -p 9000:9000 sonarqube:lts-community
 ```
 
-Access at: `http://<your-ec2-public-ip>:9000`
-
-###  Trivy (Image Vulnerability Scanner)
+### Trivy
 
 ```bash
 wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.tar.gz
@@ -99,7 +81,7 @@ tar zxvf trivy_0.18.3_Linux-64bit.tar.gz
 sudo mv trivy /usr/local/bin/
 ```
 
-###  AWS CLI (v2)
+### AWS CLI v2
 
 ```bash
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -107,7 +89,7 @@ unzip awscliv2.zip
 sudo ./aws/install
 ```
 
-###  kubectl (Kubernetes CLI)
+### kubectl
 
 ```bash
 curl -LO "https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl"
@@ -116,7 +98,7 @@ sudo mv kubectl /usr/local/bin/
 kubectl version --client
 ```
 
-###  eksctl (EKS Bootstrap Tool)
+### eksctl
 
 ```bash
 curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" -o eksctl.tar.gz
@@ -127,103 +109,82 @@ eksctl version
 
 ---
 
-## Step 3: Provision an EKS Cluster Using Terraform
-
-We’ll now create an EKS cluster using infrastructure-as-code principles with Terraform.
-
-### 🔗 Clone Project Repo
+## Step 3: Provision EKS using Terraform
 
 ```bash
 git clone https://github.com/PasupuletiBhavya/devsecops-project.git
-cd devsecops-project/k8s-project/eks-terraform
+cd k8s-project/eks-terraform
 ```
 
-### 📁 File Breakdown:
-
-* `backend.tf`: Defines remote state storage (S3 + DynamoDB)
-* `provider.tf`: AWS provider configuration
-* `main.tf`: Defines VPC, subnets, EKS cluster, node group, IAM roles, and security groups
-
-### ⚙️ Initialize and Apply Terraform
+Update `backend.tf`, `provider.tf`, `main.tf` with your configuration.
 
 ```bash
-terraform init               # Initialize the backend and download providers
-terraform plan               # Dry run to preview changes
-terraform apply --auto-approve   # Launch EKS cluster and related resources
+terraform init
+terraform plan
+terraform apply --auto-approve
 ```
-
-Once finished, the cluster and worker nodes will be live in your AWS account.
 
 ---
 
-## Step 4: Connect Jenkins EC2 Instance to EKS Cluster
-
-After EKS creation, connect your EC2 Ops Server to the EKS cluster.
-
-### ✅ Check Cluster Visibility
+## Step 4: Connect to EKS
 
 ```bash
 eksctl get cluster --region us-east-1
-```
-
-> Note: If `EKSCTL CREATED` shows as `False`, that's expected since Terraform provisioned it.
-
-### 🔧 Configure kubectl Context
-
-```bash
 aws eks update-kubeconfig --region us-east-1 --name EKS_CLOUD
-```
-
-This sets your kubeconfig to use the new cluster.
-
-### 🔍 Verify Connection to Cluster
-
-```bash
 kubectl get nodes
 ```
 
-You should see a list of worker nodes in the `Ready` state.
+---
+
+## Jenkins Server vs Worker Node
+
+* **Jenkins EC2** = control center for pipeline automation
+* **EKS Worker Node** = hosts app containers
 
 ---
 
-✅ You’ve now completed the foundational setup. Jenkins is installed, your Kubernetes cluster is live, and connectivity is confirmed. The next phase involves creating Jenkins pipelines that build, scan, push, and deploy your application to this EKS cluster.
+## CI/CD Pipeline (UAT)
 
-
-## Step 5: CI/CD for Staging & Production
-
-### Staging Build Pipeline
-
-Same as UAT pipeline, update image tag to `bhavyap007/finalround:staging-v1`
-
-### Staging Deploy Pipeline (Jenkinsfile)
-
-Update namespace to `staging` and credentials ID accordingly:
-
-```groovy
-credentialsId: 'k8s-staging-token'
-namespace: 'staging'
-```
-
-### Production Deploy Pipeline (Jenkinsfile)
+### Jenkinsfile (UAT Build)
 
 ```groovy
 pipeline {
     agent any
-    environment {
-        NAMESPACE = "prod"
-    }
+    tools { nodejs 'node16' }
+    environment { SCANNER_HOME = tool 'mysonar' }
     stages {
-        stage('Deploy to Prod') {
+        stage('CODE') {
+            steps { git "https://github.com/PasupuletiBhavya/devsecops-project.git" }
+        }
+        stage('CQA') {
             steps {
-                withKubeCredentials(kubectlCredentials: [[
-                    caCertificate: '',
-                    clusterName: 'EKS_CLOUD_PROD',
-                    contextName: 'prod-app',
-                    credentialsId: 'k8s-prod-token',
-                    namespace: "${NAMESPACE}",
-                    serverUrl: 'https://<prod-eks-endpoint>'
-                ]]) {
-                    sh "kubectl apply -f Manifests -n ${NAMESPACE}"
+                withSonarQubeEnv('mysonar') {
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectName=camp \
+                        -Dsonar.projectKey=camp
+                    '''
+                }
+            }
+        }
+        stage('QualityGates') {
+            steps { waitForQualityGate abortPipeline: false, credentialsId: 'sonar' }
+        }
+        stage('NPM Test') {
+            steps { sh 'npm install' }
+        }
+        stage('Docker Build') {
+            steps { sh 'docker build -t bhavyap007/finalround:UAT-v1 .' }
+        }
+        stage('Trivy Scan') {
+            steps { sh 'trivy image bhavyap007/finalround:UAT-v1' }
+        }
+        stage('Push Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'dockerhub') {
+                        sh 'docker push bhavyap007/finalround:UAT-v1'
+                    }
                 }
             }
         }
@@ -232,7 +193,7 @@ pipeline {
         always {
             slackSend (
                 channel: 'all-camp',
-                message: "*${currentBuild.currentResult}:* Job `${env.JOB_NAME}`\nBuild `${env.BUILD_NUMBER}`\nMore info: ${env.BUILD_URL}"
+                message: "*${currentBuild.currentResult}:* Job ${env.JOB_NAME} \nBuild: ${env.BUILD_NUMBER} \nDetails: ${env.BUILD_URL}"
             )
         }
     }
@@ -241,89 +202,80 @@ pipeline {
 
 ---
 
-## Step 6: Install and Configure Argo CD (GitOps)
+## Kubernetes Manifests for Jenkins Deployment
 
-### Install Helm 3 and Argo CD
+### service-account.yml
 
-```bash
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-chmod 700 get_helm.sh
-./get_helm.sh
-helm repo add argo-cd https://argoproj.github.io/argo-helm
-helm repo update
-kubectl create namespace argocd
-helm install argocd argo-cd/argo-cd -n argocd
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins
+  namespace: uat
 ```
 
-### Expose Argo CD
+### role.yml
 
-```bash
-kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
-kubectl get svc argocd-server -n argocd -o json | jq --raw-output .status.loadBalancer.ingress[0].hostname
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app-role
+  namespace: uat
+rules:
+  - apiGroups: ["", "apps", "autoscaling", "batch", "extensions", "policy", "rbac.authorization.k8s.io"]
+    resources: ["pods", "services", "deployments", "secrets", "configmaps", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ```
 
-### Get Argo CD Admin Password
+### rolebinding.yml
 
-```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: app-rolebinding
+  namespace: uat
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: app-role
+subjects:
+  - kind: ServiceAccount
+    name: jenkins
+    namespace: uat
 ```
 
----
+### secret.yml
 
-## Step 7: Using GitOps with Argo CD
-
-Once connected, Argo CD can:
-
-* Auto sync deployments from GitHub
-* Watch manifests for changes (e.g., replicas, image updates)
-* Visualize app structure and pod status
-* Support manual or auto rollback
-
-### GitOps Flow:
-
-1. Update GitHub manifests (e.g., replicas to 4)
-2. Argo CD syncs changes to cluster automatically
-3. Argo dashboard shows live rollout
-
----
-
-## Step 8: Cleanup Resources
-
-### Destroy Pre-Prod and Prod Resources
-
-```bash
-terraform destroy --auto-approve
-aws eks update-kubeconfig --region us-east-1 --name EKS_CLOUD
-terraform workspace select default
-terraform destroy --auto-approve
+```yaml
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: mysecretname
+  annotations:
+    kubernetes.io/service-account.name: jenkins
 ```
 
----
+Apply all:
 
-## Final Kubernetes Deployment Architecture
+```bash
+kubectl create namespace uat
+kubectl apply -f service-account.yml
+kubectl apply -f role.yml
+kubectl apply -f rolebinding.yml
+kubectl apply -f secret.yml -n uat
+```
 
-### EKS\_CLOUD (Pre-Prod)
+Retrieve token:
 
-* Namespaces: `uat`, `staging`
-* Used for full CI/CD and validation
+```bash
+kubectl describe secret mysecretname -n uat
+```
 
-### EKS\_CLOUD\_PROD (Production)
-
-* Isolated from testing
-* GitOps powered with Argo CD
-* Uses same verified Docker image from staging
-
----
-
-## What I Learned
-
-* Real-world CI/CD with Jenkins, Docker, Kubernetes
-* GitOps with Argo CD for production stability
-* Infrastructure-as-Code with Terraform
-* Image Scanning with Trivy, Quality checks with SonarQube
-* Slack notifications and complete deployment visibility
+Use in Jenkins: Add `Secret Text` with ID: `k8-token`
 
 ---
 
-✅ Project Source: [GitHub Repo](https://github.com/PasupuletiBhavya/devsecops-project)
-🙌 Connect with me on LinkedIn for feedback, questions, or DevSecOps collaboration!
+**➡️ \[Continue to Part 2 for staging, production setup, ArgoCD, and GitOps deployment...]**
