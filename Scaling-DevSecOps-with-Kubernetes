@@ -1,1 +1,858 @@
+---
+title: "CI/CD Pipeline with Docker: DevSecOps for Real-World App Deployment"
+seoTitle: "Docker-Focused Deployment Only"
+seoDescription: "Docker-Focused Deployment Only"
+datePublished: Tue Jun 10 2025 00:54:47 GMT+0000 (Coordinated Universal Time)
+cuid: cmbpt6llq000002jr8ad33d0h
+slug: cicd-pipeline-with-docker-devsecops-for-real-world-app-deployment
+cover: https://cdn.hashnode.com/res/hashnode/image/upload/v1753905658448/cd459bd3-1dd7-4135-84c7-258e9c0d54ac.jpeg
+ogImage: https://cdn.hashnode.com/res/hashnode/image/upload/v1749774705234/2480f345-c54f-4c69-a137-bd76540811b2.png
+tags: docker, github, deployment, sonarqube, kubernetes, slack, automation, devops, terraform, jenkins, devsecops, ci-cd, docker-images, devops-articles, trivy
+
+---
+
+A practical DevSecOps pipeline built entirely with Docker and Jenkins — from code to cloud.
+
+<mark>Missed the full DevSecOps journey?</mark>  
+👉 [Start here with the full 6-phase blog](https://devops-by-bhavya.hashnode.dev/campus-drive-management-a-complete-devsecops-journey-6-phases-explained)
+
+## [Understanding the 3-Tier Application](https://chatgpt.com/c/684384bf-6818-8010-93ad-a05e1740dcde)
+
+In this project, we’re working with a **three-tier web application** architecture, commonly used in modern full-stack development. The application is called **Yelp Camp** — a dynamic campground listing platform.
+
+1. **Frontend (Client-side UI):**  
+    The visual interface where users interact with the app — creating, viewing, and reviewing campgrounds.
+    
+2. **Backend (Server-side Logic):**  
+    Handles user requests, manages authentication, routes data, and applies business logic.
+    
+3. **Database (Data Storage):**  
+    Stores campground details, user information, images, and reviews.
+    
+
+---
+
+## What is Yelp Camp?
+
+**Yelp Camp** is a full-stack web application that enables users to:
+
+* Register and log in
+    
+* Create and review campgrounds
+    
+* Upload images using **Cloudinary**
+    
+* Display locations dynamically via **Mapbox**
+    
+
+### Key Features:
+
+* User registration (no email verification required)
+    
+* Form validation for unique email
+    
+* MongoDB database for storing campground data
+    
+* Map-based campground UI
+    
+* Review system (users can only delete their own reviews)
+    
+* Dynamic image uploads via **Cloudinary**
+    
+
+## Database & Deployment Strategy
+
+### Option 1: MongoDB as a Docker Container
+
+**(Not used in our final setup, but worth understanding)**
+
+* **Requires:**
+    
+    * Deployment YAML to create the MongoDB pod
+        
+    * Service to expose the pod
+        
+    * Persistent Volume (PV) and Persistent Volume Claim (PVC) for data retention
+        
+* **Drawbacks:**
+    
+    * Manual setup
+        
+    * Backup risk on pod crash
+        
+    * Storage cost and maintenance
+        
+
+### ✅ Option 2: MongoDB Atlas (Cloud Database) — *Our Choice*
+
+* **Benefits:**
+    
+    * Fully managed cloud MongoDB
+        
+    * No need for K8s pods, services, or volumes
+        
+    * UI-based dashboard for management
+        
+    * Reliable, scalable, and simple setup
+        
+* **Downside:**
+    
+    * Paid plan (Free tier available for small projects)
+        
+
+---
+
+## Required Environment Variables
+
+To get this app running, we need to configure the following secrets in `.env` or Jenkins credentials:
+
+### Cloudinary:
+
+```bash
+CLOUDINARY_CLOUD_NAME=your_cloud_name  
+CLOUDINARY_KEY=your_api_key  
+CLOUDINARY_SECRET=your_api_secret
+```
+
+### Mapbox:
+
+```bash
+MAPBOX_TOKEN=your_mapbox_token
+```
+
+### MongoDB Atlas:
+
+```bash
+DB_URL=your_mongodb_connection_string
+```
+
+## Setting Up Cloudinary for Image Uploads
+
+To enable image uploads in our Yelp Camp application, we’ll integrate **Cloudinary** — a cloud-based image and video management service.
+
+1. Go to [https://cloudinary.com](https://cloudinary.com) and **log in** (or sign up).
+    
+2. From the dashboard, click **View All API Keys.**
+    
+    
+    
+3. You’ll find the following credentials:
+    
+    * **Cloud Name**
+        
+    * **API Key**
+        
+    * **API Secret**
+        
+    * **API Environment Variable**
+        
+4. **Copy these credentials and store them securely** — we’ll use them as environment variables in the application.
+    
+
+
+
+### Setting Up Mapbox for Location Mapping
+
+To display campground locations on an interactive map, we use **Mapbox** — a powerful mapping platform for developers.
+
+1. Go to https://account.mapbox.com and **log in** (or create an account).
+    
+2. Under your account dashboard, you’ll find a **“Default Public Token.”**
+    
+3. **Copy this token** — it’s all you need for this application.
+    
+
+
+
+## Setting Up MongoDB Atlas (Cloud Database)
+
+To store all campground data (user info, reviews, locations), we use **MongoDB Atlas** — a fully managed cloud database service.
+
+1. Go to [https://www.mongodb.com/cloud/atlas and **log in** or create an account.](https://www.mongodb.com/cloud/atlas)
+    
+2. **"Create a Cluster"** to start a free-t[ier or shared cluster deployment.](https://www.mongodb.com/cloud/atlas)
+    
+
+
+
+3. After your cluster is created, click **"Create Database User"**:
+    
+
+* Choose a username & password
+    
+* **Save them securely** (we’ll use these for your app connection string)
+    
+
+
+
+4. ### Choose a Connection Method:
+    
+    1. Click on **“Connect” → “Drivers”**
+        
+    2. Select **Node.js** and copy the **MongoDB connection URL** provided
+        
+    
+    
+    
+    
+    
+    ### Enable External Access:
+    
+    By default, MongoDB Atlas restricts access to [localhost](http://localhost). To make it accessible:
+    
+    1. Go to **Network Access** in your Atlas dashboard
+        
+    2. Click **“Add IP Address”**
+        
+    3. Choose **“Allow access from anywhere” (0.0.0.0/0)**
+        
+    
+    ✅ This step ensures your app, running from any server (like EC2), can talk to the DB.
+    
+
+
+
+## Step-1: EC2 Instance Setup (AWS)
+
+* Create a `t2.large` EC2 instance with **28 GB** storage and **Linux Kernel 5.10**
+    
+* Attach a **key pair** for SSH access and configured a **security group** (ports 22, 80, 8080)
+    
+* Launch instance to install Docker, Jenkins, and run our application.
+    
+
+
+
+If you're new to Jenkins or Docker setup, check out my detailed guides:
+
+👉 [End-to-End Docker Project with Jenkins CI/CD (Node.js + Trivy)](https://devops-by-bhavya.hashnode.dev/end-to-end-docker-project-with-jenkins-cicd-deploying-a-nodejs-app-with-security-scans)  
+👉 [CI/CD Pipeline with Jenkins on AWS (EC2 Setup Guide)](https://devops-by-bhavya.hashnode.dev/end-to-end-cicd-pipeline-with-jenkins-on-aws)
+
+## Step 2: Install Jenkins, Git, Docker, Terraform, Trivy and Access the Jenkins Dashboard
+
+
+
+## Step-3: Dockerize the Application
+
+### 1\. Clone the Project Repository
+
+```bash
+git clone https://github.com/PasupuletiBhavya/devsecops-project.git
+cd devsecops-project/
+git checkout master
+```
+
+### 2\. Build the Docker Image
+
+```bash
+docker build -t image1 .
+docker images
+```
+
+### 3\. Run the Docker Container
+
+```bash
+docker run -itd --name cont1 -p 1111:3000 image1
+```
+
+But when we checke the logs:
+
+```bash
+docker logs cont1
+```
+
+We this error:  
+Error: Cannot create a client without an access token
+
+### ⚠️ What Happened?
+
+Even though the container started, the app **crashed inside** because it couldn't find the required credentials for:
+
+* **Mapbox** (for displaying maps)
+    
+* **Cloudinary** (for uploading images)
+    
+* **MongoDB Atlas** (for storing application data)
+    
+
+These are **not hardcoded** in the app. They're expected to be passed as **environment variables**
+
+### ✅ How to Fix It
+
+We fix this by passing all the necessary env variables when starting the container:
+
+```bash
+vim .env
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_KEY=
+CLOUDINARY_SECRET=
+MAPBOX_TOKEN=
+DB_URL=""
+SECRET=my key
+```
+
+Now the container runs properly and the app can talk to all 3rd-party services.
+
+```bash
+docker rm cont1
+docker build -t image2 .
+```
+
+
+
+Access the application with port number
+
+
+
+
+
+
+
+
+
+You can find all these data updated in our MongoDB
+
+
+
+
+
+Things to consider:  
+When building our Docker image for the application, we used the **Node.js Alpine image** instead of the default Node image.
+
+```bash
+# Use Node 18 as parent image
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json ./
+RUN npm install
+
+# Copy remaining app files
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Start the app
+CMD npm start
+```
+
+### Why Use Alpine?
+
+✅ **Smaller size**: Alpine-based image is only **~196MB**, whereas a default Node image may be over **1 GB**
+
+✅ **Faster deployments**: Smaller image = faster builds & pushes
+
+✅ **Security**: Fewer libraries = smaller attack surface
+
+✅ **Great with Trivy**: No vulnerabilities found during scan
+
+
+
+### What Happens Without Alpine?
+
+Image size becomes 1.1GB+
+
+Base image pulls in unnecessary dependencies
+
+Trivy detects more vulnerabilities
+
+Slower builds, more risk
+
+
+
+
+
+Always use lightweight base images like `node:18-alpine` for faster, smaller, and more secure containers.  
+Now let’s move on **Automation with Jenkins CI/CD**.
+
+## **Step-4 :Automate Dev Server Provisioning Using Terraform**
+
+To avoid manually launching EC2 instances from the AWS console, we use **Terraform** to create our **Dev server** automatically as code. This brings repeatability, version control, and automation into our infrastructure.
+
+**Create Infra Directory**
+
+```bash
+mkdir infra
+cd infra
+```
+
+**create** [`provider.tf`](http://provider.tf)
+
+This file tells Terraform which cloud provider and region we want to use.
+
+```bash
+provider "aws" {
+  region = "us-east-1"
+}
+```
+
+**Create** [`resource.tf`](http://resource.tf)
+
+```bash
+resource "aws_instance" "devserver" {
+  ami           = "ami-0e9bbd70d26d7cf4f"  # Amazon Linux 2 AMI
+  instance_type = "t2.medium"
+  key_name      = "master-slave"
+  availability_zone = "us-east-1a"
+
+  root_block_device {
+    volume_size = 20
+  }
+
+  tags = {
+    Name        = "Camp-Server"
+    Environment = "Dev"
+    Client      = "bhavya"
+  }
+}
+```
+
+### <mark>Give Terraform Permission to Create AWS Resources</mark>
+
+Terraform itself can’t create anything — it's just a CLI tool. To let it create AWS resources like EC2 instances, we need to **authenticate it with our AWS account**
+
+
+
+
+
+
+
+
+
+```bash
+terraform init
+terraform plan
+```
+
+
+
+we create our Dev server by applying the `.tf` files:
+
+```bash
+terraform apply --auto-approve
+```
+
+✅ This command automatically provisions the EC2 instance without asking for confirmation every time
+
+
+
+*update the security group*
+
+
+
+```bash
+#Install java on dev server
+yum install java-17-amazon-corretto -y
+```
+
+## **Step-5 : Master-Slave setup**
+
+Until now, we’ve been walking through the steps manually — setting up infrastructure, containerizing applications, and deploying them to the cloud. But in real-world scenarios, **DevOps Engineers automate all of this** using CI/CD pipelines.
+
+As a DevOps Engineer, I use **Terraform** to provision infrastructure — for example, creating the **Dev server** (EC2 instance) automatically.
+
+But now, we need to execute our Jenkins pipeline **on that server**. For that, we need a **Master-Slave setup**:
+
+* **Jenkins Master:** Where the pipeline is written and controlled
+    
+* **Jenkins Slave (Agent):** Where the actual pipeline runs — in our case, the EC2 Dev server.
+    
+
+Go to Manage Jenkins →Nodes → Add new Node
+
+
+
+
+
+
+
+
+
+
+
+**<mark>Install all necessary plugins ,Configure Jenkins Credentials and Tools</mark>**
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+**Lets write our pipeline**  
+Create a new JOB → Pipeline → start writing our pipeline
+
+```bash
+pipeline {
+    agent {
+        node {
+            label 'dev'
+        }
+    }
+    tools {
+        nodejs 'node16'
+    }
+    environment {
+        SCANNER_HOME = tool 'mysonar'
+    }
+    stages {
+        stage('Code Checkout') {
+            steps {
+                git "https://github.com/PasupuletiBhavya/devsecops-project.git"
+            }
+        }
+
+        stage('Code Quality Analysis') {
+            steps {
+                withSonarQubeEnv('mysonar') {
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectName=camp \
+                    -Dsonar.projectKey=camp
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-password'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t appimage .'
+            }
+        }
+
+        stage('Scan Docker Image') {
+            steps {
+                sh 'trivy image appimage'
+            }
+        }
+
+        stage('Tag Docker Image') {
+            steps {
+                sh 'docker tag appimage bhavyap007/newproject:dev-v1'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'dockerhub') {
+                        sh 'docker push bhavyap007/newproject:dev-v1'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Dev Server') {
+            steps {
+                sh 'docker run -itd --name dev-container -p 1111:3000 bhavyap007/newproject:dev-v1'
+            }
+        }
+    }
+}
+```
+
+BUILD THIS PIPELINE
+
+
+
+After successful build open SonarQube to check for bugs or vulnerabilities
+
+
+
+Access your application with your IP address and port number
+
+
+
+## **Step-6 :Automate Testing Server Provisioning Using Terraform**
+
+To isolate environments like Dev, Test, and Prod using the same Terraform code, we use **Terraform Workspaces**. This allows us to manage multiple infrastructure environments from a single codebase.
+
+1. **Modify** [`resource.tf`](http://resource.tf) to reflect the new environment:
+    
+
+```bash
+  resource "aws_instance" "devserver" {
+  ami           = "ami-0e9bbd70d26d7cf4f"
+  instance_type = "t2.medium"
+  availability_zone = "us-east-1a"
+  key_name      = "master-slave"
+
+  tags = {
+    Name        = "test-Camp-Server"
+    Environment = "test"
+    Client      = "bhavya"
+  }
+
+  root_block_device {
+    volume_size = 20
+  }
+}
+```
+
+2. **Create and switch to a new workspace**:
+    
+
+```bash
+terraform workspace new test
+```
+
+3. **Apply the infrastructure**:
+    
+
+```bash
+terraform apply --auto-approve
+```
+
+Server is created
+
+
+
+Setup Master-Slave as discussed above and create a node for testing
+
+
+
+Create New Job for testing
+
+
+
+Install Jenkins, Git, Docker, Terraform, Trivy in your testing server as well
+
+```bash
+groovyCopyEditpipeline {
+    agent {
+        node {
+            label 'test'
+        }
+    }
+    tools {
+        nodejs 'node16'
+    }
+    environment {
+        SCANNER_HOME = tool 'mysonar'
+    }
+    stages {
+        stage('Code Checkout') {
+            steps {
+                git "https://github.com/PasupuletiBhavya/devsecops-project.git"
+            }
+        }
+
+        stage('Code Quality Analysis') {
+            steps {
+                withSonarQubeEnv('mysonar') {
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectName=zomato \
+                    -Dsonar.projectKey=zomato
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-password'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t appimage .'
+            }
+        }
+
+        stage('Scan Docker Image') {
+            steps {
+                sh 'trivy image appimage'
+            }
+        }
+
+        stage('Tag Docker Image') {
+            steps {
+                sh 'docker tag appimage bhavyap007/newproject:test-v1'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'dockerhub') {
+                        sh 'docker push bhavyap007/newproject:test-v1'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Dev Server') {
+            steps {
+                sh 'docker run -itd --name test-container -p 2222:3000 bhavyap007/newproject:test-v1'
+            }
+        }
+    }
+}
+```
+
+BUILD PIPELINE
+
+
+
+
+
+## Step-7: Slack Notification in Jenkins Pipeline
+
+To notify your team about the pipeline status, we use the **Slack plugin** in Jenkins.  
+Install the **Slack Notification Plugin and configure**
+
+
+
+
+
+
+
+Login into your slack account and integrate with your Jenkins
+
+
+
+
+
+
+
+
+
+Now add slack in your pipeline under post build actions and build again
+
+```bash
+groovyCopyEditpost {
+    always {
+        echo 'Slack Notifications'
+        slackSend(
+            channel: 'my-channel',
+            message: "*${currentBuild.currentResult}:* Job `${env.JOB_NAME}` \nBuild #${env.BUILD_NUMBER} \n🔗 More info: ${env.BUILD_URL}"
+        )
+    }
+}
+```
+
+
+
+CHECK YOUR SLACK FOR UPDATES
+
+
+
+**❌ Drawbacks of Docker-only:**
+
+* Delays during container restart (10s–1min) can hurt critical apps
+    
+* No easy rollback to older versions
+    
+* No built-in auto-scaling
+    
+
+**✅ Kubernetes Benefits:**
+
+* **Auto-scaling** based on traffic
+    
+* **Rolling updates & Rollbacks**
+    
+* **Self-healing** containers
+    
+* **Cluster-based deployment** using master and worker nodes
+    
+* **Namespace isolation** for multi-app environments
+    
+
+⚠️ Docker has its limits in production. That’s why we switch to Kubernetes.  
+<mark>Ready to roll into </mark> **<mark>Staging + Production?</mark>**  
+👉 [Read my Kubernetes Deployment Blog here](https://devops-by-bhavya.hashnode.dev/scaling-devsecops-with-kubernetes-zero-downtime-auto-healing-and-more)
+
+### **Final Pipeline Flow Summary (Dev + Testing)**
+
+✅ Code pulled from GitHub
+
+*Fetched full application codebase to start the build.*
+
+✅ SonarQube Code Quality Analysis
+
+*Performed static code analysis for bugs and vulnerabilities.*
+
+✅ Docker Image Build (Alpine)
+
+*Created a lightweight and optimized image using node:18-alpine.*
+
+✅ Security Scan with Trivy
+
+*Detected and ensured no critical vulnerabilities before shipping.*
+
+✅ Tag & Push to Docker Hub
+
+*Versioned image (dev-v1) was pushed to a Docker Hub repository.*
+
+✅ Dev Deployment to EC2 Server
+
+*Application container deployed to a dedicated Dev EC2 instance.*
+
+✅ Slack Notifications
+
+*CI/CD pipeline status updates sent directly to Slack channel.*
+
+✅ Testing Server Setup (Terraform Workspace)
+
+*Created separate Testing EC2 environment using Terraform.*
+
+✅ Testing Pipeline Deployment
+
+*Same image tested in a dedicated Testing instance for UAT, Regression, and Functional testing.*
+
+### What I Learned
+
+* **Importance of Lightweight Images:**  
+    Using `node:18-alpine` significantly reduced image size and improved Trivy scan results.
+    
+* **End-to-End DevSecOps Flow with Docker:**  
+    Built a secure, automated CI/CD pipeline from scratch using Jenkins.
+    
+* **Security is Not Optional:**  
+    Trivy helped me catch vulnerabilities early before pushing to Docker Hub.
+    
+* **Infrastructure as Code (IaC):**  
+    Learned how to provision EC2 dev servers using Terraform.
+    
+* **Team Collaboration with Slack:**  
+    Seamless communication by integrating Jenkins with Slack.
+    
+
+---
+
+For anyone starting out in DevOps, building a pipeline like this is one of the best ways to gain **practical, resume-worthy experience**.
+
+If this article helped you in any way, your support would mean a lot to me 💕 — only if it's within your means.
+
+Let’s stay connected on [**LinkedIn**](https://www.linkedin.com/in/bhavya-pasupuleti/) and grow together!
+
+💬 Feel free to **comment or connect** if you have questions, feedback, or want to collaborate on similar projects.
+---
+
+👉 **To view this blog with full images and formatting, visit the original post on Hashnode:**
+[Scaling DevSecOps with Kubernetes (with images)](https://devopsbybhavya.hashnode.dev/scaling-devsecops-with-kubernetes-zero-downtime-auto-healing-and-more)
 
