@@ -278,4 +278,209 @@ Use in Jenkins: Add `Secret Text` with ID: `k8-token`
 
 ---
 
-**➡️ \[Continue to Part 2 for staging, production setup, ArgoCD, and GitOps deployment...]**
+# Scaling DevSecOps with Kubernetes: Zero Downtime, Auto Healing, and More (Part 2 of 2)
+
+## Jenkins UAT Deploy Pipeline
+
+```groovy
+pipeline {
+    agent any
+    environment {
+        NAMESPACE = "uat"
+    }
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git 'https://github.com/PasupuletiBhavya/devsecops-project.git'
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                withKubeCredentials(kubectlCredentials: [[
+                    caCertificate: '',
+                    clusterName: 'EKS_CLOUD',
+                    contextName: 'myapp',
+                    credentialsId: 'k8-token',
+                    namespace: "${NAMESPACE}",
+                    serverUrl: 'https://<eks-endpoint>'
+                ]]) {
+                    sh "kubectl apply -f Manifests -n ${NAMESPACE}"
+                }
+            }
+        }
+        stage('Verify Deployment') {
+            steps {
+                withKubeCredentials(kubectlCredentials: [[
+                    caCertificate: '',
+                    clusterName: 'EKS_CLOUD',
+                    contextName: 'myapp',
+                    credentialsId: 'k8-token',
+                    namespace: "${NAMESPACE}",
+                    serverUrl: 'https://<eks-endpoint>'
+                ]]) {
+                    sh "kubectl get all -n ${NAMESPACE}"
+                    sh 'sleep 30'
+                }
+            }
+        }
+    }
+    post {
+        always {
+            slackSend (
+                channel: 'all-camp',
+                message: "*${currentBuild.currentResult}:* Job `${env.JOB_NAME}`\nBuild `${env.BUILD_NUMBER}`\nMore info: ${env.BUILD_URL}"
+            )
+        }
+    }
+}
+```
+
+---
+
+## Staging Environment Pipelines
+
+Create two jobs like UAT, but change:
+
+* Docker image tag to:
+
+```bash
+bhavyap007/finalround:staging-v1
+```
+
+* Namespace to `staging`
+* Kubernetes credentials ID to `k8s-staging-token`
+
+Update manifests accordingly.
+
+---
+
+## Production Environment Setup
+
+Create a new Terraform workspace:
+
+```bash
+terraform workspace new prod
+terraform apply --auto-approve
+```
+
+Update kubeconfig:
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name EKS_CLOUD_PROD
+kubectl get nodes
+```
+
+Create `prod` namespace and Jenkins token:
+
+```bash
+kubectl create namespace prod
+kubectl apply -f prod-manifests/
+```
+
+Create new Jenkins job by copying `Stage_Deploy_pipeline`. Update:
+
+* Namespace → `prod`
+* credentialsId → `k8s-prod-token`
+* serverUrl → EKS\_CLOUD\_PROD URL
+
+---
+
+## Argo CD Setup using Helm
+
+### Install Helm 3
+
+```bash
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh
+```
+
+### Add Argo CD Helm Repo
+
+```bash
+helm repo add argo-cd https://argoproj.github.io/argo-helm
+helm repo update
+```
+
+### Create Namespace & Install Argo CD
+
+```bash
+kubectl create namespace argocd
+helm install argocd argo-cd/argo-cd -n argocd
+kubectl get all -n argocd
+```
+
+### Expose Argo CD via LoadBalancer
+
+```bash
+kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+```
+
+### Get Argo CD External URL
+
+```bash
+yum install jq -y
+kubectl get svc argocd-server -n argocd -o json | jq --raw-output .status.loadBalancer.ingress[0].hostname
+```
+
+### Get Admin Password
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+---
+
+## GitOps with Argo CD
+
+* Add Git repo with manifests
+* Argo CD watches repo, syncs changes
+* Visualize and rollback deployments easily
+
+You can:
+
+* Change replica count → Argo syncs
+* Change image → New app rolls out
+* Rollback → Previous version re-applies
+
+---
+
+## Clean Up Resources
+
+```bash
+terraform destroy --auto-approve
+aws eks update-kubeconfig --region us-east-1 --name EKS_CLOUD
+terraform workspace select default
+terraform destroy --auto-approve
+```
+
+---
+
+## Final Kubernetes Deployment Architecture
+
+**Pre-Prod Cluster (EKS\_CLOUD):**
+
+* Namespaces: `uat`, `staging`
+* Full CI/CD: build → test → deploy
+
+**Prod Cluster (EKS\_CLOUD\_PROD):**
+
+* Isolated from staging
+* Argo CD GitOps deploy only (no rebuilds)
+
+---
+
+## Summary of Learnings
+
+* Dockerized 3-tier app (Yelp Camp)
+* CI/CD with Jenkins, SonarQube, Trivy
+* EKS cluster provisioning with Terraform
+* Namespace & RBAC setup for Jenkins-to-K8s
+* GitOps deployments via Argo CD
+* Monitoring with Slack notifications
+
+This hands-on project mirrors real-world DevSecOps practices, ready to showcase on resumes and GitHub.
+
+---
+
+
