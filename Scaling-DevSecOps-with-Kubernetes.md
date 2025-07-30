@@ -485,7 +485,7 @@ This hands-on project mirrors real-world DevSecOps practices, ready to showcase 
 
 Repository: https://github.com/PasupuletiBhavya/devsecops-project
 
-📸 Watch the full blog for detailed steps with visuals & images: Scaling DevSecOps with Kubernetes: Full Guide
+📸 Watch the full blog for detailed steps with visuals & images: [Scaling DevSecOps with Kubernetes: Full Guide](https://devops-by-bhavya.hashnode.dev/scaling-devsecops-with-kubernetes-zero-downtime-auto-healing-and-more)
 
 
 
