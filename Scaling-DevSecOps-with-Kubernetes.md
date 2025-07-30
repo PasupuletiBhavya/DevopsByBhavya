@@ -481,5 +481,11 @@ terraform destroy --auto-approve
 This hands-on project mirrors real-world DevSecOps practices, ready to showcase on resumes and GitHub.
 
 ---
+🔗 GitHub Repository
+
+Repository: https://github.com/PasupuletiBhavya/devsecops-project
+
+📸 Watch the full blog for detailed steps with visuals & images: Scaling DevSecOps with Kubernetes: Full Guide
+
 
 
