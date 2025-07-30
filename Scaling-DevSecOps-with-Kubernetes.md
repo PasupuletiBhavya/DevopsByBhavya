@@ -19,19 +19,6 @@ We’ll cover:
 * GitOps with Argo CD
 * Environment Isolation (UAT, Staging, Prod)
 
-# Scaling DevSecOps with Kubernetes: Intro + Step 1 to 4 (In-Depth)
-
-## Introduction
-
-In the third phase of our comprehensive DevSecOps journey, we move beyond basic Docker deployments to a scalable and resilient Kubernetes setup. This shift is essential when transitioning from development environments to production-grade deployments that demand:
-
-* ⏱️ **Zero Downtime** during application upgrades
-* 🔁 **Automatic Rollbacks** in case of failures
-* 📈 **Auto Scaling** to manage fluctuating user traffic
-* ❤️ **Self-Healing** containers that recover from crashes
-
-To achieve this, we'll use Amazon EKS (Elastic Kubernetes Service), supported by Terraform for infrastructure automation, and a dedicated EC2 instance to host our DevSecOps control server running Jenkins, Docker, Trivy, SonarQube, and more.
-
 ---
 
 ## Step 1: Launch EC2 Instance for Jenkins and Tool Installation
@@ -59,13 +46,13 @@ ssh -i your-key.pem ec2-user@<your-ec2-public-ip>
 
 All commands below are to be executed on your EC2 Ops Server.
 
-### 🔧 Git (Version Control)
+### Git (Version Control)
 
 ```bash
 yum install git -y
 ```
 
-### 🔧 Jenkins (CI Server)
+###  Jenkins (CI Server)
 
 ```bash
 sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
@@ -78,7 +65,7 @@ sudo systemctl enable jenkins
 
 Access Jenkins at: `http://<your-ec2-public-ip>:8080`
 
-### 🔧 Docker (Container Engine)
+###  Docker (Container Engine)
 
 ```bash
 sudo yum install docker -y
@@ -87,14 +74,14 @@ sudo systemctl enable docker
 sudo chmod 777 /var/run/docker.sock
 ```
 
-### 🔧 Terraform (IaC Tool)
+###  Terraform (IaC Tool)
 
 ```bash
 sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
 sudo yum install terraform -y
 ```
 
-### 🔧 SonarQube (Code Quality Scanner)
+###  SonarQube (Code Quality Scanner)
 
 Run it in a container:
 
@@ -104,7 +91,7 @@ docker run -itd --name sonar -p 9000:9000 sonarqube:lts-community
 
 Access at: `http://<your-ec2-public-ip>:9000`
 
-### 🔧 Trivy (Image Vulnerability Scanner)
+###  Trivy (Image Vulnerability Scanner)
 
 ```bash
 wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.tar.gz
@@ -112,7 +99,7 @@ tar zxvf trivy_0.18.3_Linux-64bit.tar.gz
 sudo mv trivy /usr/local/bin/
 ```
 
-### 🔧 AWS CLI (v2)
+###  AWS CLI (v2)
 
 ```bash
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -120,7 +107,7 @@ unzip awscliv2.zip
 sudo ./aws/install
 ```
 
-### 🔧 kubectl (Kubernetes CLI)
+###  kubectl (Kubernetes CLI)
 
 ```bash
 curl -LO "https://dl.k8s.io/release/v1.32.0/bin/linux/amd64/kubectl"
@@ -129,7 +116,7 @@ sudo mv kubectl /usr/local/bin/
 kubectl version --client
 ```
 
-### 🔧 eksctl (EKS Bootstrap Tool)
+###  eksctl (EKS Bootstrap Tool)
 
 ```bash
 curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" -o eksctl.tar.gz
