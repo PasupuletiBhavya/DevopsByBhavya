@@ -1,186 +1,157 @@
+# End-to-End CI/CD Pipeline with Jenkins on AWS
+
+**Using Git, Maven, SonarQube, Nexus, and Tomcat to Automate Code Build, Test, and Deployment**
+
+## 🛠️ Tech Stack
+- **Git**: Source code management
+- **Maven**: Build tool
+- **SonarQube**: Code quality scanner
+- **Nexus**: Artifact repository
+- **Tomcat**: Application server
+- **Jenkins**: CI/CD automation
+- **AWS EC2**: Infrastructure for hosting services
+
 ---
 
-title: "End-to-End CI/CD Pipeline with Jenkins on AWS"
-seoTitle: "Jenkins CI/CD Pipeline on AWS"
-seoDescription: "Learn how to set up a real-world CI/CD pipeline using Jenkins, Maven, SonarQube, Nexus, and Tomcat on AWS EC2. Includes video demo and deployment."
-datePublished: Fri Apr 18 2025 06:36:56 GMT+0000 (Coordinated Universal Time)
-cuid: cm9mf2gt4000g09jrgzpr3mj9
-slug: end-to-end-cicd-pipeline-with-jenkins-on-aws
-cover: [https://cdn.hashnode.com/res/hashnode/image/upload/v1744939265256/928b20e6-7602-4a5a-aae8-199cf8e51fcb.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1744939265256/928b20e6-7602-4a5a-aae8-199cf8e51fcb.png)
-ogImage: [https://cdn.hashnode.com/res/hashnode/image/upload/v1744958202876/ff61b9a9-5d45-4c63-b8aa-cc2d10c37af1.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1744958202876/ff61b9a9-5d45-4c63-b8aa-cc2d10c37af1.png)
-tags: aws, github, sonarqube, maven, devops, jenkins, tomcat, pipeline, nexus, ci-cd, codenewbies, gitcommands, devops-cicd-jenkins-aws-maven-sonarqube-nexus-tomcat
---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## 🚀 Step-by-Step Setup
 
-<h1 align="center">🚀 End-to-End CI/CD Pipeline with Jenkins on AWS</h1>
-<p align="center"><i>By Bhavya Pasupuleti • DevOps Engineer • 2025</i></p>
+### Step 1: Launch EC2 Instances
+Launch **4 EC2 instances** using the same PEM file:
+- Jenkins: t2.micro
+- Tomcat: t2.micro
+- SonarQube: t2.medium + 25GB EBS
+- Nexus: t2.medium + 25GB EBS
 
-<p align="center">
-  <img src="https://cdn.hashnode.com/res/hashnode/image/upload/v1744939265256/928b20e6-7602-4a5a-aae8-199cf8e51fcb.png" width="80%">
-</p>
+Set up each tool on its own instance.
 
-## Introduction
+### Step 2: Install DevOps Tools
 
-In today’s fast-paced software development world, DevOps plays a critical role in automating the build, test, and deployment process. In this blog, I’ll walk you through a complete **end-to-end CI/CD pipeline** I built using **Jenkins on AWS EC2**, integrating popular DevOps tools like **Git, Maven, SonarQube, Nexus**, and **Tomcat**. This hands-on project not only helped me understand how each tool fits into the software development lifecycle but also gave me real-world experience in deploying a robust and scalable automation pipeline.
-
-## 🔧 Tech Stack
-
-* Git: Source code management
-* Maven: Build tool
-* SonarQube: Code quality check
-* Nexus: Artifact storage
-* Tomcat: Webserver for deployment
-* Jenkins: CI/CD pipeline
-* AWS EC2: Hosting all services
-
-## ⚙️ Step-by-Step Process to Deploy the Application
-
-### STEP 1: Launch 4 EC2 Instances with Same PEM File
-
-* Jenkins: t2.micro
-* Tomcat: t2.micro
-* SonarQube: t2.medium (25 GB of EBS)
-* Nexus: t2.medium (25 GB of EBS)
-
-<p align="center">
-  <img src="https://cdn.hashnode.com/res/hashnode/image/upload/v1744944384391/08883885-d532-4e1a-88a6-15d7f9f2fad3.png" width="80%">
-</p>
-
-### STEP 2: Install Jenkins, Tomcat, SonarQube, Nexus
-
-Each instance was configured with its respective service using shell scripts. Here are brief examples:
-
-#### Jenkins
-
+**Jenkins**
 ```bash
-# Install Git and Java
-sudo yum install git java-17-amazon-corretto -y
-# Add Jenkins repo and install
+yum install git -y
 sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
 sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-sudo yum install jenkins -y
-sudo systemctl start jenkins
+sudo yum upgrade
+sudo yum install fontconfig java-21-openjdk jenkins
+sudo systemctl daemon-reload
+yum install java-17-amazon-corretto -y
+yum install jenkins -y
+systemctl start jenkins.service
 ```
 
-#### Tomcat
-
+**Tomcat**
 ```bash
-# Install Java
-sudo yum install java-17-amazon-corretto -y
-# Download and extract Tomcat
+yum install java-17-amazon-corretto -y
 wget https://downloads.apache.org/tomcat/tomcat-9/v9.0.104/bin/apache-tomcat-9.0.104.tar.gz
-# Configure users and remove IP restrictions
-# Start Tomcat
-sh apache-tomcat-9.0.104/bin/startup.sh
+tar -zxvf apache-tomcat-9.0.104.tar.gz
+# Add users
+# Remove IP restrictions
+sh bin/startup.sh
 ```
 
-#### SonarQube
-
+**Nexus**
 ```bash
-# Install Java OpenJDK 11
+yum install java-17-amazon-corretto -y
+cd /opt
+wget https://download.sonatype.com/nexus/3/nexus-unix-x86-64-3.79.0-09.tar.gz
+tar -zxvf nexus-unix-x86-64-3.79.0-09.tar.gz
+useradd nexus
+# Edit nexus run_as_user
+su - nexus
+/opt/nexus-3.79.0-09/bin/nexus start
+```
+
+**SonarQube**
+```bash
 amazon-linux-extras install java-openjdk11 -y
-# Download and unzip SonarQube
+cd /opt/
 wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-8.9.6.50800.zip
 unzip sonarqube-8.9.6.50800.zip
-# Create sonar user and start service
+useradd sonar
+chown sonar:sonar sonarqube-8.9.6.50800 -R
+su - sonar
+cd /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/
+sh sonar.sh start
 ```
 
-#### Nexus
+---
 
-```bash
-# Install Java
-yum install java-17-amazon-corretto -y
-# Download and extract Nexus
-wget https://download.sonatype.com/nexus/3/nexus-unix-x86-64-3.79.0-09.tar.gz
-# Start Nexus and retrieve admin password
-```
+### Step 3: Configure Jenkins
 
-## 🧪 Jenkins Pipeline Setup
+- Install Plugins:
+  - SonarQube Scanner
+  - Nexus Artifact Uploader
+  - SSH Agent
 
-Once Jenkins and all other services were up, I created a **Scripted Pipeline Job** in Jenkins with the following stages:
+- Add Maven installer (v3.9.9)
 
-### STAGE 1: Get Code from GitHub
+---
+
+### Step 4: Jenkinsfile Pipeline
 
 ```groovy
 node {
-  stage("Code") {
-    git 'https://github.com/PasupuletiBhavya/one.git'
-  }
-```
-
-### STAGE 2: Build the Source Code
-
-```groovy
-  stage("Build") {
-    def mavenHome = tool name: "maven3", type: "maven"
-    sh "${mavenHome}/bin/mvn clean package"
-  }
-```
-
-### STAGE 3: SonarQube Analysis
-
-```groovy
-  stage("CQA") {
-    withSonarQubeEnv('mysonar') {
-      sh "${mavenHome}/bin/mvn sonar:sonar"
+    stage("Code") {
+        git "https://github.com/PasupuletiBhavya/one.git"
     }
-  }
-```
 
-### STAGE 4: Upload Artifact to Nexus
-
-```groovy
-  stage("Nexus") {
-    nexusArtifactUploader artifacts: [[
-      artifactId: 'myweb', file: 'target/myweb-8.6.9.war', type: 'war'
-    ]],
-    credentialsId: 'nexus',
-    groupId: 'in.javahome',
-    nexusUrl: 'http://<nexus-ip>:8081',
-    nexusVersion: 'nexus3',
-    repository: 'bhavya-repo',
-    version: '8.6.9'
-  }
-```
-
-### STAGE 5: Deploy to Tomcat
-
-```groovy
-  stage("Deployment") {
-    sshagent(['ssh-key-id']) {
-      sh 'scp target/*.war ec2-user@<tomcat-ip>:/home/ec2-user/apache-tomcat-9.0.104/webapps/'
+    stage("Build") {
+        def mavenHome = tool name: "maven3", type: "maven"
+        def mavenCMD = "${mavenHome}/bin/mvn"
+        sh "${mavenCMD} clean package"
     }
-  }
+
+    stage("CQA") {
+        withSonarQubeEnv('mysonar') {
+            def mavenHome = tool name: "maven3", type: "maven"
+            def mavenCMD = "${mavenHome}/bin/mvn"
+            sh "${mavenCMD} sonar:sonar"
+        }
+    }
+
+    stage("Nexus") {
+        nexusArtifactUploader artifacts: [[
+            artifactId: 'myweb',
+            classifier: '',
+            file: 'target/myweb-8.6.9.war',
+            type: 'war'
+        ]],
+        credentialsId: 'nexus',
+        groupId: 'in.javahome',
+        nexusUrl: '34.229.123.124:8081',
+        nexusVersion: 'nexus3',
+        protocol: 'http',
+        repository: 'bhavya-repo',
+        version: '8.6.9'
+    }
+
+    stage("Deployment") {
+        sshagent(['8bce0b0e-c5db-4aac-bf07-4831ca13a760']) {
+            sh 'scp -o StrictHostKeyChecking=no target/*.war ec2-user@52.23.240.218:/home/ec2-user/apache-tomcat-9.0.104/webapps/'
+        }
+    }
 }
 ```
 
-<p align="center">
-  <img src="https://cdn.hashnode.com/res/hashnode/image/upload/v1744952395185/95a0f441-2324-45b1-b586-6d86d32cce50.png" width="80%">
-</p>
+---
 
-## ✅ Final Pipeline Flow Summary
+## 🧠 What I Learned
 
-1. Code pushed to GitHub
-2. Jenkins job pulls code
-3. Maven builds WAR
-4. SonarQube scans it
-5. WAR uploaded to Nexus
-6. WAR deployed to Tomcat
+- Integrated Jenkins with SonarQube, Nexus, Tomcat.
+- Automated build-test-deploy workflow.
+- Managed AWS EC2 infrastructure.
+- Hands-on DevOps implementation experience.
 
-## 🎓 What I Learned
+---
 
-* How CI/CD pipelines work in real-world projects
-* Jenkins integration with Maven, SonarQube, Nexus
-* How to manage multiple EC2 instances efficiently
-* Automating deployments end-to-end
+## 🔗 Resources
 
-## 🔗 Resources & Links
+- GitHub: [https://github.com/PasupuletiBhavya](https://github.com/PasupuletiBhavya)
+- Jenkins: https://www.jenkins.io
+- SonarQube: https://www.sonarqube.org
+- Nexus: https://www.sonatype.com
+- Tomcat: https://tomcat.apache.org
 
-* GitHub: [https://github.com/PasupuletiBhavya](https://github.com/PasupuletiBhavya)
-* Jenkins: [jenkins.io](https://www.jenkins.io/)
-* SonarQube: [sonarqube.org](https://www.sonarqube.org/)
-* Nexus: [sonatype.com](https://www.sonatype.com/)
-* Tomcat: [tomcat.apache.org](https://tomcat.apache.org/)
+---
 
-## 💬 Let’s Connect
-
-If this article added value to your journey, connect with me on [LinkedIn](https://www.linkedin.com/in/bhavya-pasupuleti/). Let’s keep growing together 🚀
+💡 _If this helped you, consider connecting on [LinkedIn](https://linkedin.com/in/bhavya-pasupuleti)._ 
