@@ -5,6 +5,7 @@ DevOpsByBhavya
 DevOps & Site Reliability Engineering projects showcasing automation, observability, CI/CD, and cloud-native infrastructure. Each project is documented with tutorials and blogs for reproducibility.
 
 📊 Projects & Blogs
+
 **Kubernetes & Observability**
 
 Full-Stack Observability on AWS EKS: Prometheus, Grafana & ELK with Helm
